@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ТУТ. — места для знакомств</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Unbounded:wght@400;500;700;900&display=swap" rel="stylesheet" />
+
+<style>
+  :root {
+    --midnight: #140022;
+    --paprika: #CF5C36;
+    --coral: #F08B6A;
+    --alabaster: #DDDDDD;
+    --honey: #FCC773;
+    --gradient-warm: linear-gradient(135deg, #CF5C36, #FCC773);
+    --gradient-card: linear-gradient(135deg, #140022, #2a0044);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--midnight);
+    color: var(--alabaster);
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    background: var(--gradient-warm);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 4px 20px rgba(207, 92, 54, 0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 200px;
+    height: 200px;
+    background: rgba(252, 199, 115, 0.3);
+    border-radius: 50%;
+    filter: blur(40px);
+  }
+  header h1 {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 900;
+    font-size: 28px;
+    color: var(--midnight);
+    position: relative;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0px rgba(20, 0, 34, 0.15);
+  }
+  header .hint {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--midnight);
+    opacity: 0.8;
+    position: relative;
+  }
+
+  .container {
+    display: grid;
+    grid-template-columns: 340px 1fr 380px;
+    height: calc(100vh - 62px);
+  }
+
+  .places {
+    background: var(--gradient-card);
+    overflow-y: auto;
+    border-right: 2px solid rgba(240, 139, 106, 0.2);
+  }
+  .places h2 {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    padding: 18px 20px;
+    font-size: 16px;
+    border-bottom: 2px solid rgba(240, 139, 106, 0.2);
+    background: rgba(20, 0, 34, 0.8);
+    position: sticky;
+    top: 0;
+    color: var(--honey);
+    backdrop-filter: blur(10px);
+  }
+  .place-card {
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(240, 139, 106, 0.15);
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .place-card:hover {
+    background: rgba(207, 92, 54, 0.15);
+    transform: translateX(4px);
+  }
+  .place-card.active {
+    background: linear-gradient(90deg, rgba(207, 92, 54, 0.3), transparent);
+    border-left: 4px solid var(--coral);
+  }
+  .place-card .name {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: var(--alabaster);
+  }
+  .place-card .category {
+    display: inline-block;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 500;
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    background: var(--gradient-warm);
+    color: var(--midnight);
+    margin-right: 6px;
+    margin-bottom: 6px;
+  }
+  .place-card .desc {
+    font-size: 12px;
+    color: rgba(221, 221, 221, 0.7);
+    line-height: 1.4;
+  }
+  .place-card .people-preview {
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--coral);
+    font-style: italic;
+  }
+  .place-card .go-btn {
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: var(--gradient-warm);
+    color: var(--midnight);
+    border: none;
+    border-radius: 25px;
+    cursor: pointer;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    display: none;
+    transition: all 0.25s;
+    box-shadow: 0 4px 15px rgba(207, 92, 54, 0.4);
+  }
+  .place-card .go-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(207, 92, 54, 0.6);
+  }
+  .place-card .go-btn.show { display: inline-block; }
+  .place-card .go-btn.confirmed {
+    background: linear-gradient(135deg, #666, #888);
+    cursor: default;
+    box-shadow: none;
+  }
+  .place-card .go-btn.confirmed:hover {
+    transform: none;
+    box-shadow: none;
+  }
+
+  #map { height: 100%; width: 100%; }
+
+  .chat {
+    background: var(--gradient-card);
+    display: none;
+    flex-direction: column;
+    border-left: 2px solid rgba(240, 139, 106, 0.2);
+  }
+  .chat.show { display: flex; }
+  .chat-header {
+    padding: 18px 20px;
+    border-bottom: 2px solid rgba(240, 139, 106, 0.2);
+    background: rgba(20, 0, 34, 0.8);
+    backdrop-filter: blur(10px);
+  }
+  .chat-header h2 {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--honey);
+    margin-bottom: 4px;
+  }
+  .chat-header .status {
+    font-size: 12px;
+    color: var(--coral);
+    font-weight: 500;
+  }
+  .chat-header .status::before {
+    content: '●';
+    margin-right: 6px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .msg {
+    max-width: 80%;
+    padding: 10px 14px;
+    border-radius: 18px;
+    font-size: 13px;
+    line-height: 1.4;
+    word-wrap: break-word;
+    animation: msgIn 0.3s ease;
+  }
+  @keyframes msgIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .msg.me {
+    align-self: flex-end;
+    background: var(--gradient-warm);
+    color: var(--midnight);
+    border-bottom-right-radius: 4px;
+    font-weight: 500;
+  }
+  .msg.other {
+    align-self: flex-start;
+    background: rgba(240, 139, 106, 0.15);
+    border: 1px solid rgba(240, 139, 106, 0.3);
+    border-bottom-left-radius: 4px;
+  }
+  .msg .author {
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--coral);
+    margin-bottom: 3px;
+  }
+  .msg.me .author { color: var(--midnight); opacity: 0.7; }
+  .chat-input {
+    display: flex;
+    padding: 12px;
+    border-top: 2px solid rgba(240, 139, 106, 0.2);
+    gap: 10px;
+    background: rgba(20, 0, 34, 0.5);
+  }
+  .chat-input input {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 25px;
+    border: 2px solid rgba(240, 139, 106, 0.3);
+    background: rgba(20, 0, 34, 0.8);
+    color: var(--alabaster);
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    transition: border-color 0.2s;
+  }
+  .chat-input input:focus {
+    border-color: var(--coral);
+  }
+  .chat-input input::placeholder {
+    color: rgba(221, 221, 221, 0.4);
+  }
+  .chat-input button {
+    padding: 12px 20px;
+    border-radius: 25px;
+    border: none;
+    background: var(--gradient-warm);
+    color: var(--midnight);
+    cursor: pointer;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    transition: transform 0.2s;
+  }
+  .chat-input button:hover {
+    transform: scale(1.05);
+  }
+
+  .route-info {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(20, 0, 34, 0.95);
+    border: 2px solid var(--coral);
+    padding: 14px 24px;
+    border-radius: 30px;
+    font-family: 'Unbounded', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    box-shadow: 0 8px 30px rgba(207, 92, 54, 0.4);
+    z-index: 1000;
+    display: none;
+    color: var(--honey);
+  }
+  .route-info.show { display: block; animation: slideUp 0.4s ease; }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .route-info b { color: var(--coral); }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--midnight); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--coral);
+    border-radius: 3px;
+  }
+
+  @media (max-width: 900px) {
+    .container {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+    }
+    .places { max-height: 30vh; }
+    .chat { max-height: 40vh; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>ТУТ.</h1>
+  <div class="hint">Выбери место → нажми "Иду!" → общайся</div>
+</header>
+
+<div class="container">
+  <aside class="places">
+    <h2>🔥 Места для встреч</h2>
+    <div id="places-list"></div>
+  </aside>
+
+  <main style="position: relative;">
+    <div id="map"></div>
+    <div class="route-info" id="route-info"></div>
+  </main>
+
+  <aside class="chat" id="chat-panel">
+    <div class="chat-header">
+      <h2>💬 Чат встречи</h2>
+      <div class="status">онлайн</div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <form class="chat-input" id="chat-form">
+      <input type="text" id="chat-input" placeholder="Напиши сообщение..." autocomplete="off" />
+      <button type="submit">➤</button>
+    </form>
+  </aside>
+</div>
+
+<script>
+const places = [
+  { id: 1, name: "Парк Горького", category: "🌳 Парк", desc: "Прогулки, кафе, живая музыка по выходным", lat: 55.7313, lng: 37.6031, people: ["Анна", "Максим"] },
+  { id: 2, name: "Кофейня «Surf Coffee»", category: "☕ Кафе", desc: "Уютное место для знакомств за чашкой кофе", lat: 55.7558, lng: 37.6173, people: ["Дарья", "Илья"] },
+  { id: 3, name: "Коворкинг «Точка»", category: "💼 Коворкинг", desc: "Нетворкинг-вечера по четвергам", lat: 55.7602, lng: 37.6186, people: ["Сергей", "Ольга"] },
+  { id: 4, name: "Каток ВДНХ", category: "⛸ Активность", desc: "Катание, музыка, тёплая атмосфера", lat: 55.8266, lng: 37.6375, people: ["Катя", "Артём"] },
+  { id: 5, name: "Квиз-бар «Mozart»", category: "🎲 Развлечения", desc: "Командные игры, новые знакомства", lat: 55.7522, lng: 37.6156, people: ["Виктор", "Мария"] }
+];
+
+const map = L.map('map').setView([55.7558, 37.6173], 12);
+
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  attribution: 'Tiles &copy; Esri',
+  maxZoom: 18
+}).addTo(map);
+
+const markers = {};
+places.forEach(p => {
+  const m = L.marker([p.lat, p.lng])
+    .addTo(map)
+    .bindPopup(`<b style="font-family:Unbounded">${p.name}</b><br>${p.desc}<br><em>Тут: ${p.people.join(', ')}</em>`);
+  markers[p.id] = m;
+});
+
+const list = document.getElementById('places-list');
+places.forEach(p => {
+  const card = document.createElement('div');
+  card.className = 'place-card';
+  card.dataset.id = p.id;
+  card.innerHTML = `
+    <div class="name">${p.name}</div>
+    <span class="category">${p.category}</span>
+    <div class="desc">${p.desc}</div>
+    <div class="people-preview">👥 ${p.people.join(', ')}</div>
+    <button class="go-btn" data-id="${p.id}">🚶 Иду!</button>
+  `;
+  card.onclick = (e) => {
+    if (e.target.classList.contains('go-btn')) return;
+    selectPlace(p.id);
+  };
+  list.appendChild(card);
+});
+
+let userMarker = null;
+let routeLine = null;
+let currentPlace = null;
+let confirmedPlaceId = null;
+
+function selectPlace(id) {
+  const p = places.find(x => x.id === id);
+
+  document.querySelectorAll('.place-card').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.place-card[data-id="${id}"]`).classList.add('active');
+
+  document.querySelectorAll('.go-btn').forEach(btn => btn.classList.remove('show'));
+  const goBtn = document.querySelector(`.go-btn[data-id="${id}"]`);
+  updateGoButton(goBtn, id);
+
+  map.flyTo([p.lat, p.lng], 15, {
+    duration: 1.5,
+    easeLinearity: 0.25
+  });
+
+  setTimeout(() => {
+    markers[id].openPopup();
+  }, 800);
+
+  goBtn.onclick = (e) => {
+    e.stopPropagation();
+    handleGoClick(id);
+  };
+}
+
+function updateGoButton(btn, placeId) {
+  if (confirmedPlaceId === placeId) {
+    btn.textContent = '✓ Вы идёте';
+    btn.classList.add('show', 'confirmed');
+  } else {
+    btn.textContent = '🚶 Иду!';
+    btn.classList.add('show');
+    btn.classList.remove('confirmed');
+  }
+}
+
+function handleGoClick(placeId) {
+  const p = places.find(x => x.id === placeId);
+
+  if (confirmedPlaceId === placeId) return;
+
+  if (confirmedPlaceId !== null) {
+    const oldPlace = places.find(x => x.id === confirmedPlaceId);
+    const confirmed = confirm(
+      `⚠️ Вы уже идёте в "${oldPlace.name}".\n\n` +
+      `Если вы выберете "${p.name}", маршрут изменится, ` +
+      `а чат переключится на новое место.\n\n` +
+      `Продолжить?`
+    );
+    if (!confirmed) return;
+
+    const oldBtn = document.querySelector(`.go-btn[data-id="${confirmedPlaceId}"]`);
+    if (oldBtn) {
+      oldBtn.textContent = '🚶 Иду!';
+      oldBtn.classList.remove('confirmed');
+    }
+  }
+
+  confirmedPlaceId = placeId;
+  const goBtn = document.querySelector(`.go-btn[data-id="${placeId}"]`);
+  goBtn.textContent = '✓ Вы идёте';
+  goBtn.classList.add('confirmed');
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => buildRoute(pos.coords.latitude, pos.coords.longitude, p.lat, p.lng),
+      err => alert('Не удалось получить местоположение'),
+      { enableHighAccuracy: true }
+    );
+  }
+
+  showChat(placeId);
+}
+
+function buildRoute(fromLat, fromLng, toLat, toLng) {
+  if (userMarker) map.removeLayer(userMarker);
+  userMarker = L.marker([fromLat, fromLng], {
+    icon: L.divIcon({
+      html: '<div style="background:#F08B6A;width:18px;height:18px;border-radius:50%;border:3px solid #140022;box-shadow:0 0 10px rgba(240,139,106,0.8);"></div>',
+      className: '', iconSize: [18, 18]
+    })
+  }).addTo(map).bindPopup('Ты здесь');
+
+  if (routeLine) map.removeLayer(routeLine);
+
+  const url = `https://router.project-osrm.org/route/v1/walking/${fromLng},${fromLat};${toLng},${toLat}?overview=full&geometries=geojson`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (!data.routes || !data.routes.length) return;
+      const route = data.routes[0];
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      routeLine = L.polyline(coords, { color: '#CF5C36', weight: 5, opacity: 0.9 }).addTo(map);
+
+      map.flyToBounds(routeLine.getBounds(), {
+        padding: [50, 50],
+        duration: 1.2,
+        easeLinearity: 0.25
+      });
+
+      const km = (route.distance / 1000).toFixed(2);
+      const min = Math.round(route.duration / 60);
+      const info = document.getElementById('route-info');
+      info.innerHTML = `🚶 До места: <b>${km} км</b> · <b>${min} мин</b> пешком`;
+      info.classList.add('show');
+    })
+    .catch(err => console.error('Ошибка маршрута:', err));
+}
+
+function showChat(placeId) {
+  const chatPanel = document.getElementById('chat-panel');
+  chatPanel.classList.add('show');
+  loadChat(placeId);
+}
+
+const messagesEl = document.getElementById('messages');
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+
+function loadChat(placeId) {
+  currentPlace = places.find(x => x.id === placeId);
+  messagesEl.innerHTML = '';
+  const key = 'chat_' + placeId;
+  let msgs = JSON.parse(localStorage.getItem(key) || '[]');
+
+  if (msgs.length === 0) {
+    const p = places.find(x => x.id === placeId);
+    msgs = [
+      { author: p.people[0], text: 'Привет! Я уже тут, жду 🙌', me: false },
+      { author: p.people[1], text: 'Буду через 10 минут!', me: false }
+    ];
+    localStorage.setItem(key, JSON.stringify(msgs));
+  }
+
+  msgs.forEach(renderMsg);
+  scrollDown();
+}
+
+function renderMsg(m) {
+  const div = document.createElement('div');
+  div.className = 'msg ' + (m.me ? 'me' : 'other');
+  div.innerHTML = `${!m.me ? `<div class="author">${m.author}</div>` : ''}${m.text}`;
+  messagesEl.appendChild(div);
+}
+
+function scrollDown() {
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+chatForm.addEventListener('submit', e => {
+  e.preventDefault();
+  sendMessage();
+});
+
+chatInput.addEventListener('keypress', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+function sendMessage() {
+  const text = chatInput.value.trim();
+  if (!text || !currentPlace) return;
+
+  const msg = { author: 'Ты', text, me: true };
+  const key = 'chat_' + currentPlace.id;
+  const msgs = JSON.parse(localStorage.getItem(key) || '[]');
+  msgs.push(msg);
+  localStorage.setItem(key, JSON.stringify(msgs));
+
+  renderMsg(msg);
+  chatInput.value = '';
+  scrollDown();
+
+  setTimeout(() => {
+    const replies = ['Отлично, договорились! 👍', 'Супер, жду!', 'Ок, буду ждать у входа', 'Классно, до встречи!', 'Уже в пути 🚶'];
+    const reply = {
+      author: currentPlace.people[Math.floor(Math.random() * currentPlace.people.length)],
+      text: replies[Math.floor(Math.random() * replies.length)],
+      me: false
+    };
+    const msgs2 = JSON.parse(localStorage.getItem(key) || '[]');
+    msgs2.push(reply);
+    localStorage.setItem(key, JSON.stringify(msgs2));
+    renderMsg(reply);
+    scrollDown();
+  }, 1200);
+}
+</script>
+
+</body>
+</html>
